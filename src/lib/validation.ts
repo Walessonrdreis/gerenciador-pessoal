@@ -30,6 +30,7 @@ export const taskCreateSchema = z.object({
     .object({
       preset: z.enum(['agora', '30min', '1h', '1dia', 'custom']),
       customAt: z.string().datetime({ offset: true }).optional(),
+      leadMinutes: z.number().int().min(0).max(1440).optional(), // antecedência do push (15/60/1440)
     })
     .nullable()
     .optional(),

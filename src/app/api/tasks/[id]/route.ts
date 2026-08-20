@@ -61,6 +61,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           const nextOcc = await prisma.taskOccurrence.create({
             data: { taskId: task.id, dueAt: nextDueAt },
           });
+          if (task.reminderPreset) {
+            const { createReminderForOccurrence } = await import('@/lib/reminders');
+            await createReminderForOccurrence({
+              taskId: task.id,
+              occurrenceId: nextOcc.id,
+              dueAt: nextDueAt,
+              preset: task.reminderPreset,
+            });
+          }
           next = {
             id: nextOcc.id,
             taskId: nextOcc.taskId,
@@ -109,6 +118,37 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (!cat) return NextResponse.json({ error: 'categoria não encontrada' }, { status: 400 });
   }
 
+  if (fields.reminder?.preset) {
+    const { createReminderForOccurrence, cancelScheduledReminder } = await import('@/lib/reminders');
+    const activeOcc = await prisma.taskOccurrence.findFirst({
+      where: { taskId: task.id, status: 'pendente' },
+      orderBy: { dueAt: 'asc' },
+    });
+    if (activeOcc) {
+      const existing = await prisma.reminder.findFirst({
+        where: { taskId: task.id, occurrenceId: activeOcc.id, status: 'pendente' },
+      });
+      if (existing?.qstashScheduleId) await cancelScheduledReminder(existing.qstashScheduleId);
+      await createReminderForOccurrence({
+        taskId: task.id,
+        occurrenceId: activeOcc.id,
+        dueAt: activeOcc.dueAt,
+        preset: fields.reminder.preset,
+        customAt: fields.reminder.customAt,
+        leadMinutes: fields.reminder.leadMinutes,
+      });
+    }
+  }
+
+  if (fields.reminder === null) {
+    const { cancelScheduledReminder } = await import('@/lib/reminders');
+    const pendentes = await prisma.reminder.findMany({ where: { taskId: task.id, status: 'pendente' } });
+    await Promise.allSettled(
+      pendentes.map((r) => (r.qstashScheduleId ? cancelScheduledReminder(r.qstashScheduleId) : Promise.resolve()))
+    );
+    await prisma.reminder.updateMany({ where: { taskId: task.id, status: 'pendente' }, data: { status: 'falhou' } });
+  }
+
   const updatedTask = await prisma.task.update({
     where: { id: task.id },
     // TaskUpdateInput (checked) rejeita `categoryId: null` via spread — uso o
@@ -144,6 +184,14 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   const { id } = await params;
   const task = await prisma.task.findFirst({ where: { id, userId } });
   if (!task) return NextResponse.json({ error: 'tarefa não encontrada' }, { status: 404 });
+
+  const reminders = await prisma.reminder.findMany({
+    where: { taskId: task.id, qstashScheduleId: { not: null } },
+  });
+  const { cancelScheduledReminder } = await import('@/lib/reminders');
+  await Promise.allSettled(
+    reminders.map((r) => (r.qstashScheduleId ? cancelScheduledReminder(r.qstashScheduleId) : Promise.resolve()))
+  );
 
   await prisma.task.delete({ where: { id } });
   return NextResponse.json({ ok: true });

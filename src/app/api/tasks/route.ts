@@ -103,5 +103,17 @@ export async function POST(req: NextRequest) {
     data: { taskId: task.id, dueAt: new Date(dueAt) },
   });
 
+  if (parsed.data.reminder?.preset) {
+    const { createReminderForOccurrence } = await import('@/lib/reminders');
+    await createReminderForOccurrence({
+      taskId: task.id,
+      occurrenceId: occurrence.id,
+      dueAt: new Date(dueAt),
+      preset: parsed.data.reminder.preset,
+      customAt: parsed.data.reminder.customAt,
+      leadMinutes: parsed.data.reminder.leadMinutes,
+    });
+  }
+
   return NextResponse.json({ task, occurrence }, { status: 201 });
 }
