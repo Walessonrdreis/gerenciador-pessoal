@@ -11,17 +11,20 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  googleId  String   @unique
-  name      String
-  email     String   @unique
-  avatarUrl String?
-  createdAt DateTime @default(now())
+  id            String    @id @default(cuid())
+  googleId      String?   @unique // o PrismaAdapter do Auth.js nunca preenche — o ID do Google fica em Account.providerAccountId
+  name          String
+  email         String    @unique
+  emailVerified DateTime? // lido pelo PrismaAdapter (e-mail verificado do provider)
+  avatarUrl     String?
+  createdAt     DateTime  @default(now())
 
   tasks      Task[]
   categories Category[]
   pushSubs   PushSubscription[]
   templates  TaskTemplate[]
+  accounts   Account[]
+  sessions   Session[]
 }
 
 model Category {
@@ -127,4 +130,46 @@ model TaskTemplate {
   createdAt      DateTime  @default(now())
 
   @@index([userId])
+}
+
+// Modelos do PrismaAdapter do Auth.js (padrão oficial dos docs Auth.js + Prisma).
+// Os campos em snake_case (access_token, refresh_token, etc.) são exigidos pelo
+// adapter — não renomear. Com Google, o id do usuário fica em Account.providerAccountId.
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
 }
