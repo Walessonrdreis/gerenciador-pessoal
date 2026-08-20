@@ -1,11 +1,15 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import SyncStatus from '@/components/SyncStatus';
+import Fab from '@/components/Fab';
+import TaskForm from '@/components/TaskForm';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const [formOpen, setFormOpen] = useState(false);
 
   const tabs = [
     { href: '/', label: 'hoje' },
@@ -27,6 +31,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </span>
       </nav>
       <main className="content">{children}</main>
+      <Fab onClick={() => setFormOpen(true)} />
+      <TaskForm open={formOpen} onClose={() => setFormOpen(false)} onCreated={() => window.location.reload()} />
     </div>
   );
 }
