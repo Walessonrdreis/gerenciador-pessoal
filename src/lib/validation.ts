@@ -44,3 +44,19 @@ export const categorySchema = z.object({
   name: z.string().trim().min(1, 'nome é obrigatório').max(40),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'cor inválida').default('#7FD88F'),
 });
+
+export const templateSchema = z.object({
+  name: z.string().trim().min(1, 'nome é obrigatório').max(80),
+  subtasks: z
+    .array(
+      z.object({
+        titulo: z.string().trim().min(1).max(200),
+        ordem: z.number().int().min(0),
+      })
+    )
+    .max(50)
+    .optional(),
+  priority: z.enum(PRIORITIES).default('media'),
+  categoryId: z.string().cuid().optional().nullable(),
+  reminderPreset: z.enum(['agora', '30min', '1h', '1dia', 'custom']).optional().nullable(),
+});
