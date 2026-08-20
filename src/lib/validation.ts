@@ -5,7 +5,8 @@ export const PRIORITIES = ['alta', 'media', 'baixa'] as const;
 export const subtaskSchema = z.object({
   title: z.string().trim().min(1, 'título da subtarefa é obrigatório').max(200),
   done: z.boolean().default(false),
-  ordem: z.number().int().min(0).default(0),
+  // opcional (não default 0): deixa o fallback `s.ordem ?? i` do POST gerar [0,1,2...]
+  ordem: z.number().int().min(0).optional(),
 });
 
 export const taskCreateSchema = z.object({

@@ -1,0 +1,148 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
+import { prisma } from '@/lib/db';
+import { getAuthUserId } from '@/lib/auth';
+import { taskUpdateSchema } from '@/lib/validation';
+import { nextOccurrence, parseRule } from '@/lib/recurrence';
+
+// PATCH:
+// - { done: true, occurrenceId } → conclui a ocorrência; com regra, cria a próxima e devolve { occurrence, next }
+// - { done: false, occurrenceId } → desfaz (volta para pendente)
+// - subtaskId no path → atualiza a subtarefa (title/done)
+// - demais campos → atualiza a tarefa (parciais; `subtasks` substitui a lista, com fallback de ordem)
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string; subtaskId?: string }> }) {
+  const userId = await getAuthUserId();
+  if (!userId) return NextResponse.json({ error: 'não autenticado' }, { status: 401 });
+
+  const { id, subtaskId } = await params;
+  const task = await prisma.task.findFirst({ where: { id, userId } });
+  if (!task) return NextResponse.json({ error: 'tarefa não encontrada' }, { status: 404 });
+
+  const parsed = taskUpdateSchema.safeParse(await req.json());
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
+  }
+  const { done, occurrenceId, subtasks, ...fields } = parsed.data;
+
+  if (done === true) {
+    if (!occurrenceId) return NextResponse.json({ error: 'occurrenceId é obrigatório para concluir' }, { status: 400 });
+
+    const occurrence = await prisma.taskOccurrence.findFirst({
+      where: { id: occurrenceId, taskId: task.id },
+    });
+    if (!occurrence) return NextResponse.json({ error: 'ocorrência não encontrada' }, { status: 404 });
+
+    const updated = await prisma.taskOccurrence.update({
+      where: { id: occurrence.id },
+      data: { status: 'concluida', completedAt: new Date() },
+    });
+
+    let next = null;
+    if (task.rule) {
+      const parsedRule = parseRule(task.rule);
+      if (parsedRule.ok) {
+        const nextDueAt = nextOccurrence(parsedRule.rule, updated.dueAt);
+        if (nextDueAt) {
+          const nextOcc = await prisma.taskOccurrence.create({
+            data: { taskId: task.id, dueAt: nextDueAt },
+          });
+          next = {
+            id: nextOcc.id,
+            taskId: nextOcc.taskId,
+            title: task.title,
+            notes: task.notes,
+            priority: task.priority,
+            dueAt: nextOcc.dueAt.toISOString(),
+            status: nextOcc.status,
+            completedAt: null,
+            rule: task.rule,
+            ordem: task.ordem,
+            subtasks: [],
+            category: null,
+          };
+        }
+      }
+    }
+
+    return NextResponse.json({
+      occurrence: {
+        id: updated.id,
+        status: updated.status,
+        completedAt: updated.completedAt?.toISOString() ?? null,
+      },
+      next,
+    });
+  }
+
+  if (done === false) {
+    if (!occurrenceId) return NextResponse.json({ error: 'occurrenceId é obrigatório' }, { status: 400 });
+    const occurrence = await prisma.taskOccurrence.findFirst({ where: { id: occurrenceId, taskId: task.id } });
+    if (!occurrence) return NextResponse.json({ error: 'ocorrência não encontrada' }, { status: 404 });
+    const updated = await prisma.taskOccurrence.update({
+      where: { id: occurrence.id },
+      data: { status: 'pendente', completedAt: null },
+    });
+    return NextResponse.json({ occurrence: { id: updated.id, status: updated.status, completedAt: null } });
+  }
+
+  if (subtaskId) {
+    const sub = await prisma.subtask.findFirst({ where: { id: subtaskId, taskId: task.id } });
+    if (!sub) return NextResponse.json({ error: 'subtarefa não encontrada' }, { status: 404 });
+    const updated = await prisma.subtask.update({
+      where: { id: sub.id },
+      data: {
+        ...(fields.title !== undefined ? { title: fields.title } : {}),
+        ...(done !== undefined ? { done } : {}),
+      },
+    });
+    return NextResponse.json(updated);
+  }
+
+  if (Object.keys(fields).length === 0 && !subtasks) {
+    return NextResponse.json({ error: 'nenhum campo para atualizar' }, { status: 400 });
+  }
+
+  if (fields.categoryId) {
+    const cat = await prisma.category.findFirst({ where: { id: fields.categoryId, userId } });
+    if (!cat) return NextResponse.json({ error: 'categoria não encontrada' }, { status: 400 });
+  }
+
+  const updatedTask = await prisma.task.update({
+    where: { id: task.id },
+    // TaskUpdateInput (checked) rejeita `categoryId: null` via spread — uso o
+    // unchecked, que aceita o scalar com null (mesmo efeito, tipo limpo)
+    data: {
+      ...(fields.title !== undefined ? { title: fields.title } : {}),
+      ...(fields.notes !== undefined ? { notes: fields.notes } : {}),
+      ...(fields.priority !== undefined ? { priority: fields.priority } : {}),
+      ...(fields.categoryId !== undefined ? { categoryId: fields.categoryId } : {}),
+      ...(fields.rule !== undefined ? { rule: fields.rule as object | null } : {}),
+      ...(fields.ordem !== undefined ? { ordem: fields.ordem } : {}),
+      ...(fields.reminder?.preset ? { reminderPreset: fields.reminder.preset } : {}),
+      ...(subtasks
+        ? {
+            subtasks: {
+              deleteMany: {},
+              create: subtasks.map((s, i) => ({ title: s.title, done: s.done, ordem: s.ordem ?? i })),
+            },
+          }
+        : {}),
+    } as Prisma.TaskUncheckedUpdateInput,
+  });
+
+  return NextResponse.json({ task: updatedTask });
+}
+
+// DELETE: remove a tarefa; subtarefas e ocorrências caem em cascata (onDelete: Cascade).
+// Lembretes/QStash entram na Task 12.
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const userId = await getAuthUserId();
+  if (!userId) return NextResponse.json({ error: 'não autenticado' }, { status: 401 });
+
+  const { id } = await params;
+  const task = await prisma.task.findFirst({ where: { id, userId } });
+  if (!task) return NextResponse.json({ error: 'tarefa não encontrada' }, { status: 404 });
+
+  await prisma.task.delete({ where: { id } });
+  return NextResponse.json({ ok: true });
+}
