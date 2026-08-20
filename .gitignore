@@ -5,11 +5,16 @@ node_modules/
 .next/
 out/
 dist/
+/coverage
+*.tsbuildinfo
 
 # ambiente
 .env
 .env.local
 .env*.local
+.env*.example
+!.env.example
+next-env.d.ts
 
 # superpowers (sessões de brainstorm com chaves locais)
 .superpowers/
@@ -21,3 +26,6 @@ dist/
 *.log
 .DS_Store
 Thumbs.db
+
+# vercel
+.vercel
