@@ -48,7 +48,10 @@ export async function createReminderForOccurrence(opts: {
   leadMinutes?: number;
 }): Promise<void> {
   const { computeRemindAt, computePushAt } = await import('@/lib/reminder-rule');
-  const remindAt = computeRemindAt(opts.dueAt, opts.preset as never, opts.customAt);
+  // preset 'custom' só vale com customAt (escolha de criação); sem ele, cai em
+  // 'agora' — senão computeRemindAt lança com new Date(NaN)
+  const preset = opts.preset === 'custom' && !opts.customAt ? 'agora' : opts.preset;
+  const remindAt = computeRemindAt(opts.dueAt, preset as never, opts.customAt);
   // o push dispara deslocado pela antecedência (leadMinutes); o remindAt da linha continua sendo o lembrete real
   const pushAt = computePushAt(remindAt, opts.leadMinutes);
   if (pushAt.getTime() <= Date.now()) return; // disparo no passado: não agenda

@@ -66,6 +66,24 @@ describe('createReminderForOccurrence', () => {
     expect(count).toBe(0);
   });
 
+  it('preset custom sem customAt cai em agora (não lança)', async () => {
+    const task = await prisma.task.create({ data: { userId, title: 'Custom sem hora' } });
+    const occ = await prisma.taskOccurrence.create({
+      data: { taskId: task.id, dueAt: new Date(Date.now() + 60 * 60 * 1000) },
+    });
+
+    await createReminderForOccurrence({
+      taskId: task.id,
+      occurrenceId: occ.id,
+      dueAt: occ.dueAt,
+      preset: 'custom', // sem customAt — o path de re-schedule do done:true chega assim
+    });
+
+    const reminder = await prisma.reminder.findFirst({ where: { taskId: task.id } });
+    expect(reminder).not.toBeNull();
+    expect(reminder!.remindAt.getTime()).toBe(occ.dueAt.getTime()); // = agora (dueAt)
+  });
+
   it('agenda push deslocado pela antecedência (leadMinutes)', async () => {
     const task = await prisma.task.create({ data: { userId, title: 'Com lead' } });
     const occ = await prisma.taskOccurrence.create({

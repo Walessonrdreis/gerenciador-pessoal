@@ -1,19 +1,32 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { Suspense, useMemo, useState } from 'react';
 import { useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import TaskRow from '@/components/TaskRow';
 import { useTasks, type TaskRowData } from '@/hooks/useTasks';
 import { apiPatch, apiGet } from '@/lib/api';
 
 export default function Lista() {
+  return (
+    <Suspense>
+      <ListaContent />
+    </Suspense>
+  );
+}
+
+function ListaContent() {
   const [busca, setBusca] = useState('');
   const [categoria, setCategoria] = useState<string | null>(null);
   const [prioridade, setPrioridade] = useState<string | null>(null);
   const [cats, setCats] = useState<{ id: string; name: string }[]>([]);
 
+  // o calendário chega em /lista?dia=YYYY-MM-DD; a API já filtra por `dia`
+  const dia = useSearchParams().get('dia');
+
   const qs = [
     'status=pendente',
+    dia ? `dia=${dia}` : '',
     categoria ? `categoria=${categoria}` : '',
     prioridade ? `prioridade=${prioridade}` : '',
     busca ? `busca=${encodeURIComponent(busca)}` : '',

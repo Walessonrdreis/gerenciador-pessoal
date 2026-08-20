@@ -19,7 +19,9 @@ export async function POST(req: NextRequest) {
   const { endpoint, p256dh, auth } = parsed.data;
   const sub = await prisma.pushSubscription.upsert({
     where: { endpoint },
-    update: { p256dh, auth },
+    // re-atribui a subscription ao usuário atual: o unique fica no endpoint, mas
+    // se outro usuário logar no mesmo navegador, a posse muda para ele
+    update: { userId, p256dh, auth },
     create: { userId, endpoint, p256dh, auth },
   });
   return NextResponse.json({ id: sub.id });
