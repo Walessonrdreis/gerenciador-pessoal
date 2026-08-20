@@ -128,7 +128,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       const existing = await prisma.reminder.findFirst({
         where: { taskId: task.id, occurrenceId: activeOcc.id, status: 'pendente' },
       });
-      if (existing?.qstashScheduleId) await cancelScheduledReminder(existing.qstashScheduleId);
+      if (existing) {
+        if (existing.qstashScheduleId) await cancelScheduledReminder(existing.qstashScheduleId);
+        // não deixa linha pendente órfã: a antiga é substituída pela nova
+        await prisma.reminder.update({ where: { id: existing.id }, data: { status: 'falhou' } });
+      }
       await createReminderForOccurrence({
         taskId: task.id,
         occurrenceId: activeOcc.id,
@@ -147,6 +151,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       pendentes.map((r) => (r.qstashScheduleId ? cancelScheduledReminder(r.qstashScheduleId) : Promise.resolve()))
     );
     await prisma.reminder.updateMany({ where: { taskId: task.id, status: 'pendente' }, data: { status: 'falhou' } });
+    // limpa o preset da tarefa: sem isso o lembrete "removido" ressuscita ao
+    // concluir a ocorrência (done:true re-agenda com o preset fantasma)
+    await prisma.task.update({ where: { id: task.id }, data: { reminderPreset: null } });
   }
 
   const updatedTask = await prisma.task.update({

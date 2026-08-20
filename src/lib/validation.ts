@@ -32,6 +32,9 @@ export const taskCreateSchema = z.object({
       customAt: z.string().datetime({ offset: true }).optional(),
       leadMinutes: z.number().int().min(0).max(1440).optional(), // antecedência do push (15/60/1440)
     })
+    .refine((r) => r.preset !== 'custom' || Boolean(r.customAt), {
+      message: 'preset custom exige customAt',
+    })
     .nullable()
     .optional(),
 });

@@ -1,8 +1,9 @@
 import { Client } from '@upstash/qstash';
 import { prisma } from '@/lib/db';
 
-const REPUSH_INTERVAL_MIN = 10;
-const REPUSH_MAX_PER_DAY = 30;
+// Constantes do re-push: vivem aqui (lib) e o trigger importa — evitar duplicação
+export const REPUSH_INTERVAL_MIN = 10;
+export const REPUSH_MAX_PER_DAY = 30;
 
 function qstash(): Client {
   return new Client({ token: process.env.QSTASH_TOKEN ?? 'mock-token' });
@@ -46,9 +47,11 @@ export async function createReminderForOccurrence(opts: {
   customAt?: string;
   leadMinutes?: number;
 }): Promise<void> {
-  const { computeRemindAt } = await import('@/lib/reminder-rule');
+  const { computeRemindAt, computePushAt } = await import('@/lib/reminder-rule');
   const remindAt = computeRemindAt(opts.dueAt, opts.preset as never, opts.customAt);
-  if (remindAt.getTime() <= Date.now()) return; // lembrete no passado: não agenda
+  // o push dispara deslocado pela antecedência (leadMinutes); o remindAt da linha continua sendo o lembrete real
+  const pushAt = computePushAt(remindAt, opts.leadMinutes);
+  if (pushAt.getTime() <= Date.now()) return; // disparo no passado: não agenda
 
   const reminder = await prisma.reminder.create({
     data: {
@@ -59,7 +62,7 @@ export async function createReminderForOccurrence(opts: {
     },
   });
   try {
-    const { qstashScheduleId } = await scheduleReminder(reminder.id, remindAt);
+    const { qstashScheduleId } = await scheduleReminder(reminder.id, pushAt);
     await prisma.reminder.update({ where: { id: reminder.id }, data: { qstashScheduleId } });
   } catch (e) {
     console.error('falha ao agendar lembrete', e);
