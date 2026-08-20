@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import SyncStatus from '@/components/SyncStatus';
 import Fab from '@/components/Fab';
 import TaskForm from '@/components/TaskForm';
+import NotificationGate from '@/components/NotificationGate';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -30,7 +31,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <SyncStatus />
         </span>
       </nav>
-      <main className="content">{children}</main>
+      <main className="content">
+        {children}
+        <NotificationGate />
+      </main>
       <Fab onClick={() => setFormOpen(true)} />
       <TaskForm open={formOpen} onClose={() => setFormOpen(false)} onCreated={() => window.location.reload()} />
     </div>
