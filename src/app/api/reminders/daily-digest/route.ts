@@ -25,7 +25,18 @@ export async function POST(req: NextRequest) {
   if (!payload.userId) return NextResponse.json({ error: 'userId ausente' }, { status: 400 });
 
   const now = new Date();
-  const startOfDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  // Dia local em America/Sao_Paulo: Brasil sem DST desde 2019 → offset fixo
+  // UTC-3, então 00:00 BRT = 03:00 UTC (Date.UTC(y, m, d, 3))
+  const [d, m, y] = new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  })
+    .format(now)
+    .split('/')
+    .map(Number);
+  const startOfDay = new Date(Date.UTC(y, m - 1, d, 3));
   const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000);
 
   const pendentes = await prisma.taskOccurrence.count({

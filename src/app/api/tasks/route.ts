@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
         ? {
             dueAt: {
               gte: new Date(`${dia}T00:00:00.000Z`),
-              lt: new Date(`${dia}T23:59:59.999Z`),
+              lt: new Date(`${dia}T24:00:00.000Z`), // meia-noite do dia seguinte: intervalo semi-aberto cobre o dia inteiro
             },
           }
         : {}),

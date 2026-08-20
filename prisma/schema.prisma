@@ -109,11 +109,12 @@ model PushSubscription {
   id        String   @id @default(cuid())
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  endpoint  String   @unique
+  endpoint  String // sem @unique global: posse é por (endpoint, userId) — ninguém rouba a subscription de outro usuário
   p256dh    String
   auth      String
   createdAt DateTime @default(now())
 
+  @@unique([endpoint, userId])
   @@index([userId])
 }
 

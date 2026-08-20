@@ -75,8 +75,18 @@ export async function POST(req: NextRequest) {
   // reutilizam a mesma linha de Reminder, então contar linhas por remindAt pegaria
   // ~1 sempre; e `gte dayStart` pegaria lembretes de amanhã. A contagem roda antes
   // deste disparo gravar o sentAt, então compara pushesToday + 1 (este disparo)
-  const dayStart = new Date(r.remindAt);
-  dayStart.setUTCHours(0, 0, 0, 0);
+  // Dia local em America/Sao_Paulo: Brasil sem DST desde 2019 → offset fixo
+  // UTC-3, então 00:00 BRT = 03:00 UTC (Date.UTC(y, m, d, 3))
+  const [d, m, y] = new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  })
+    .format(r.remindAt)
+    .split('/')
+    .map(Number);
+  const dayStart = new Date(Date.UTC(y, m - 1, d, 3));
   const endOfDay = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
   const now = new Date();
   const pushesToday = await prisma.reminder.count({

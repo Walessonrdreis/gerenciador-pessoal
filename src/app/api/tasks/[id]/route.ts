@@ -147,10 +147,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (fields.reminder === null) {
     const { cancelScheduledReminder } = await import('@/lib/reminders');
     const pendentes = await prisma.reminder.findMany({ where: { taskId: task.id, status: 'pendente' } });
+    // 1) vira a linha para `falhou` ANTES de cancelar o schedule: se o cancelamento
+    //    falhar, o schedule órfão que disparar depois esbarra no guard
+    //    `status !== 'pendente'` (trigger) e morre — sem re-push do lembrete removido
+    await prisma.reminder.updateMany({ where: { taskId: task.id, status: 'pendente' }, data: { status: 'falhou' } });
     await Promise.allSettled(
       pendentes.map((r) => (r.qstashScheduleId ? cancelScheduledReminder(r.qstashScheduleId) : Promise.resolve()))
     );
-    await prisma.reminder.updateMany({ where: { taskId: task.id, status: 'pendente' }, data: { status: 'falhou' } });
     // limpa o preset da tarefa: sem isso o lembrete "removido" ressuscita ao
     // concluir a ocorrência (done:true re-agenda com o preset fantasma)
     await prisma.task.update({ where: { id: task.id }, data: { reminderPreset: null } });
