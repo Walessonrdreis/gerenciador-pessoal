@@ -6,9 +6,11 @@ import { taskUpdateSchema } from '@/lib/validation';
 import { nextOccurrence, parseRule } from '@/lib/recurrence';
 
 // PATCH:
+// - subtaskId no path → atualiza a subtarefa (title/done) — ANTES dos branches
+//   de done: o teste do brief chama este PATCH com { done: true } + subtaskId
+//   e espera update de subtarefa (não conclusão de ocorrência)
 // - { done: true, occurrenceId } → conclui a ocorrência; com regra, cria a próxima e devolve { occurrence, next }
 // - { done: false, occurrenceId } → desfaz (volta para pendente)
-// - subtaskId no path → atualiza a subtarefa (title/done)
 // - demais campos → atualiza a tarefa (parciais; `subtasks` substitui a lista, com fallback de ordem)
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string; subtaskId?: string }> }) {
   const userId = await getAuthUserId();
@@ -23,6 +25,19 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
   }
   const { done, occurrenceId, subtasks, ...fields } = parsed.data;
+
+  if (subtaskId) {
+    const sub = await prisma.subtask.findFirst({ where: { id: subtaskId, taskId: task.id } });
+    if (!sub) return NextResponse.json({ error: 'subtarefa não encontrada' }, { status: 404 });
+    const updated = await prisma.subtask.update({
+      where: { id: sub.id },
+      data: {
+        ...(fields.title !== undefined ? { title: fields.title } : {}),
+        ...(done !== undefined ? { done } : {}),
+      },
+    });
+    return NextResponse.json(updated);
+  }
 
   if (done === true) {
     if (!occurrenceId) return NextResponse.json({ error: 'occurrenceId é obrigatório para concluir' }, { status: 400 });
@@ -83,19 +98,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       data: { status: 'pendente', completedAt: null },
     });
     return NextResponse.json({ occurrence: { id: updated.id, status: updated.status, completedAt: null } });
-  }
-
-  if (subtaskId) {
-    const sub = await prisma.subtask.findFirst({ where: { id: subtaskId, taskId: task.id } });
-    if (!sub) return NextResponse.json({ error: 'subtarefa não encontrada' }, { status: 404 });
-    const updated = await prisma.subtask.update({
-      where: { id: sub.id },
-      data: {
-        ...(fields.title !== undefined ? { title: fields.title } : {}),
-        ...(done !== undefined ? { done } : {}),
-      },
-    });
-    return NextResponse.json(updated);
   }
 
   if (Object.keys(fields).length === 0 && !subtasks) {
