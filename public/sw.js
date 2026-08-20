@@ -1,7 +1,5 @@
 const CACHE = 'gestor-v1';
-// /manifest.webmanifest e /icons/* entram quando a Task 13 criar o manifest —
-// cache.addAll falha (404) e quebra a instalação do SW se listar o que não existe.
-const SHELL = ['/', '/lista', '/concluidas', '/calendario', '/entrar'];
+const SHELL = ['/', '/lista', '/concluidas', '/calendario', '/entrar', '/manifest.webmanifest'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

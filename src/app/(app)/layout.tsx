@@ -7,6 +7,7 @@ import SyncStatus from '@/components/SyncStatus';
 import Fab from '@/components/Fab';
 import TaskForm from '@/components/TaskForm';
 import NotificationGate from '@/components/NotificationGate';
+import InstallPrompt from '@/components/InstallPrompt';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -34,6 +35,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <main className="content">
         {children}
         <NotificationGate />
+        <InstallPrompt />
       </main>
       <Fab onClick={() => setFormOpen(true)} />
       <TaskForm open={formOpen} onClose={() => setFormOpen(false)} onCreated={() => window.location.reload()} />
