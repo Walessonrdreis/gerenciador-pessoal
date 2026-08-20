@@ -14,6 +14,9 @@ dist/
 # superpowers (sessões de brainstorm com chaves locais)
 .superpowers/
 
+# worktrees (isolamento de implementação)
+.worktrees/
+
 # logs e SO
 *.log
 .DS_Store
