@@ -32,9 +32,11 @@ O E2E roda contra o banco de **teste** (`TEST_DATABASE_URL`) com `AUTH_SECRET` f
 (instalada em `.env.example`; o webServer do Playwright injeta essa URL e um cookie
 JWT fake assinado com a mesma chave — não depende de credenciais reais).
 
+> ⚠️ o cookie HS256 fake não é aceito pelo Auth.js v5 (o session JWT é criptografado/JWE) — o E2E aguarda um fluxo de sessão válido (login Google real ou credentials provider em modo de teste).
+
 ```bash
 npx playwright install chromium
-TEST_DATABASE_URL="postgresql://..." AUTH_SECRET="secret-e2e-nao-usar-em-prod" npx playwright test
+TEST_DATABASE_URL="postgresql://..." AUTH_SECRET="secret-e2e-nao-usar-em-prod-1234567890" npx playwright test
 ```
 
 Limite conhecido: se o teste rodar entre 23:00 e 00:00 local, "daqui a 1h" cai no

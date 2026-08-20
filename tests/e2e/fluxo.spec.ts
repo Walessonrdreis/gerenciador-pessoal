@@ -1,7 +1,7 @@
 import { createHmac } from 'node:crypto';
 import { expect, test } from '@playwright/test';
 
-const AUTH_SECRET = process.env.AUTH_SECRET ?? 'secret-e2e-nao-usar-em-prod';
+const AUTH_SECRET = process.env.AUTH_SECRET ?? 'secret-e2e-nao-usar-em-prod-1234567890';
 
 // JWT HS256 no formato que o Auth.js v5 aceita (cookie authjs.session-token).
 // Interceptar /api/auth/session não basta: o middleware lê o cookie no servidor.

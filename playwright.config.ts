@@ -14,7 +14,7 @@ export default defineConfig({
     timeout: 120_000,
     env: {
       DATABASE_URL: process.env.TEST_DATABASE_URL ?? '',
-      AUTH_SECRET: process.env.AUTH_SECRET ?? 'secret-e2e-nao-usar-em-prod',
+      AUTH_SECRET: process.env.AUTH_SECRET ?? 'secret-e2e-nao-usar-em-prod-1234567890',
     },
   },
 });
