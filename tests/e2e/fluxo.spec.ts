@@ -3,7 +3,9 @@ import { expect, test } from '@playwright/test';
 
 const AUTH_SECRET = process.env.AUTH_SECRET ?? 'secret-e2e-nao-usar-em-prod-1234567890';
 
-// JWT HS256 no formato que o Auth.js v5 aceita (cookie authjs.session-token).
+// Cookie fake (authjs.session-token) assinado HS256. ATENÇÃO: o Auth.js v5
+// criptografa o session JWT (JWE) — este cookie HS256 é REJEITADO; o E2E
+// aguarda um fluxo de sessão válido (ver caveat no README).
 // Interceptar /api/auth/session não basta: o middleware lê o cookie no servidor.
 function fakeSessionToken(): string {
   const enc = (o: object) => Buffer.from(JSON.stringify(o)).toString('base64url');
