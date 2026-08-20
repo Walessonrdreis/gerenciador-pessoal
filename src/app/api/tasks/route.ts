@@ -13,6 +13,10 @@ export async function GET(req: NextRequest) {
   const categoria = params.get('categoria');
   const prioridade = params.get('prioridade');
   const busca = params.get('busca')?.trim();
+  const dia = params.get('dia'); // YYYY-MM-DD (do calendário)
+  if (dia && !/^\d{4}-\d{2}-\d{2}$/.test(dia)) {
+    return NextResponse.json({ error: 'dia deve ser YYYY-MM-DD' }, { status: 400 });
+  }
 
   const now = new Date();
   const startOfToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
@@ -28,6 +32,14 @@ export async function GET(req: NextRequest) {
       },
       ...(status === 'pendente' ? { status: 'pendente' } : {}),
       ...(status === 'concluida' ? { status: 'concluida' } : {}),
+      ...(dia
+        ? {
+            dueAt: {
+              gte: new Date(`${dia}T00:00:00.000Z`),
+              lt: new Date(`${dia}T23:59:59.999Z`),
+            },
+          }
+        : {}),
       ...(hoje
         ? {
             status: 'pendente',
