@@ -72,8 +72,9 @@ function ListaContent() {
     }
   };
 
-  const chip = (label: string, active: boolean, onClick: () => void) => (
+  const chip = (label: string, active: boolean, onClick: () => void, key?: string) => (
     <button
+      key={key ?? label}
       onClick={onClick}
       style={{
         border: `1px solid ${active ? 'var(--accent)' : 'var(--line)'}`,
@@ -98,7 +99,7 @@ function ListaContent() {
       <input placeholder="> buscar: _" value={busca} onChange={(e) => setBusca(e.target.value)} style={{ marginTop: 10 }} />
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
         {chip('todas', categoria === null && prioridade === null, () => { setCategoria(null); setPrioridade(null); })}
-        {cats.map((c) => chip(`[${c.name}]`, categoria === c.id, () => setCategoria(categoria === c.id ? null : c.id)))}
+        {cats.map((c) => chip(`[${c.name}]`, categoria === c.id, () => setCategoria(categoria === c.id ? null : c.id), c.id))}
         {chip('!alta', prioridade === 'alta', () => setPrioridade(prioridade === 'alta' ? null : 'alta'))}
       </div>
 

@@ -5,6 +5,7 @@ import { prisma } from '@/lib/db';
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
+  trustHost: true, // dev: permite login vindo de localhost ou do IP da rede local (celular)
   providers: [Google],
   session: { strategy: 'jwt' },
   pages: { signIn: '/entrar' },
