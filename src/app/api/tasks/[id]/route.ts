@@ -47,6 +47,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     });
     if (!occurrence) return NextResponse.json({ error: 'ocorrência não encontrada' }, { status: 404 });
 
+    // idempotente: se já estava concluída (clique duplo / retry), não gera outra
+    // "próxima" ocorrência de novo — senão duplica a recorrência com datas diferentes
+    if (occurrence.status === 'concluida') {
+      return NextResponse.json({
+        occurrence: { id: occurrence.id, status: occurrence.status, completedAt: occurrence.completedAt?.toISOString() ?? null },
+        next: null,
+      });
+    }
+
     const updated = await prisma.taskOccurrence.update({
       where: { id: occurrence.id },
       data: { status: 'concluida', completedAt: new Date() },
@@ -113,6 +122,27 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (!occurrenceId) return NextResponse.json({ error: 'occurrenceId é obrigatório' }, { status: 400 });
     const occurrence = await prisma.taskOccurrence.findFirst({ where: { id: occurrenceId, taskId: task.id } });
     if (!occurrence) return NextResponse.json({ error: 'ocorrência não encontrada' }, { status: 404 });
+
+    // desfazer conclusão de uma ocorrência recorrente: a "próxima" já foi criada
+    // ao concluir (veja done:true acima) — sem removê-la agora, fica duplicada
+    // (a mesma tarefa recorrente com duas datas pendentes ao mesmo tempo)
+    if (task.rule && occurrence.status === 'concluida') {
+      const spawned = await prisma.taskOccurrence.findFirst({
+        where: { taskId: task.id, status: 'pendente', dueAt: { gt: occurrence.dueAt } },
+        orderBy: { dueAt: 'asc' },
+      });
+      if (spawned) {
+        const spawnedReminders = await prisma.reminder.findMany({
+          where: { occurrenceId: spawned.id, qstashScheduleId: { not: null } },
+        });
+        const { cancelScheduledReminder } = await import('@/lib/reminders');
+        await Promise.allSettled(
+          spawnedReminders.map((r) => (r.qstashScheduleId ? cancelScheduledReminder(r.qstashScheduleId) : Promise.resolve()))
+        );
+        await prisma.taskOccurrence.delete({ where: { id: spawned.id } }); // reminders caem em cascata
+      }
+    }
+
     const updated = await prisma.taskOccurrence.update({
       where: { id: occurrence.id },
       data: { status: 'pendente', completedAt: null },

@@ -31,10 +31,20 @@ export default function TaskRow({
   const [expanded, setExpanded] = useState(false);
   const [subs, setSubs] = useState<SubtaskData[]>(row.subtasks ?? []);
   const [confirmingIgnore, setConfirmingIgnore] = useState(false);
+  // feedback visual instantâneo do checkbox: a lista de fora (Hoje/Lista) filtra
+  // por status e some com a linha assim que reordena/refaz — sem isso o "[x]"
+  // nunca chega a aparecer na tela antes de sumir
+  const [localDone, setLocalDone] = useState(row.status === 'concluida');
   const openEdit = useTaskEditor();
 
   useEffect(() => setSubs(row.subtasks ?? []), [row.subtasks]);
   useEffect(() => setConfirmingIgnore(false), [row.id]);
+  useEffect(() => setLocalDone(row.status === 'concluida'), [row.status, row.id]);
+
+  const handleToggle = () => {
+    setLocalDone((d) => !d);
+    setTimeout(() => onToggle(row), 350); // dá tempo do usuário ver o check antes da linha sumir/mover
+  };
 
   const meta = [
     row.dueAt ? new Date(row.dueAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '',
@@ -70,7 +80,7 @@ export default function TaskRow({
   const orderedSubs = subReorder.displayOrder.map((id) => subs.find((s) => s.id === id)).filter((s): s is SubtaskData => Boolean(s));
 
   return (
-    <div className="task" data-done={row.status === 'concluida'} ref={dragHandle?.setRef}>
+    <div className="task" data-done={localDone} ref={dragHandle?.setRef}>
       {dragHandle && (
         <button
           className="cb"
@@ -86,10 +96,10 @@ export default function TaskRow({
       )}
       <button
         className="cb"
-        onClick={() => onToggle(row)}
-        aria-label={row.status === 'concluida' ? 'desfazer conclusão' : 'concluir'}
+        onClick={handleToggle}
+        aria-label={localDone ? 'desfazer conclusão' : 'concluir'}
       >
-        {row.status === 'concluida' ? '[x]' : '[ ]'}
+        {localDone ? '[x]' : '[ ]'}
       </button>
       <div style={{ flex: 1 }}>
         <div
@@ -97,7 +107,7 @@ export default function TaskRow({
           onClick={() => openEdit(row)}
           style={{
             cursor: 'pointer',
-            ...(row.status === 'concluida' ? { color: 'var(--dim)', textDecoration: 'line-through' } : {}),
+            ...(localDone ? { color: 'var(--dim)', textDecoration: 'line-through' } : {}),
           }}
         >
           {row.title}
@@ -128,7 +138,7 @@ export default function TaskRow({
           </div>
         )}
       </div>
-      {onIgnore && row.status === 'pendente' && (
+      {onIgnore && !localDone && (
         confirmingIgnore ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'flex-end' }}>
             <span className="meta" style={{ whiteSpace: 'nowrap' }}>ignorar mesmo?</span>
