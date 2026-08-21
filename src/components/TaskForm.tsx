@@ -303,7 +303,13 @@ export default function TaskForm({
             {subs.map((s, i) => (
               <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4 }}>
                 <span style={{ color: 'var(--accent)' }}>{s.done ? '[x]' : '[ ]'}</span>
-                <span style={{ flex: 1, fontSize: 13 }}>{s.title}</span>
+                <input
+                  value={s.title}
+                  onChange={(e) =>
+                    setSubs((prev) => prev.map((x, j) => (j === i ? { ...x, title: e.target.value } : x)))
+                  }
+                  style={{ flex: 1, fontSize: 13 }}
+                />
                 <button onClick={() => setSubs((prev) => prev.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: 'var(--dim)', cursor: 'pointer', padding: 0, width: 'auto' }}>
                   x
                 </button>
