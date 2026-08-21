@@ -7,7 +7,7 @@ export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({
     // Prisma 7 exige um driver adapter — SQLite local para dev/teste
-    adapter: new PrismaBetterSqlite3({ url: process.env.DATABASE_URL }),
+    adapter: new PrismaBetterSqlite3({ url: process.env.DATABASE_URL ?? 'file:./dev.db' }),
   });
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;

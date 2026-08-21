@@ -20,6 +20,7 @@ export interface TaskRowData {
   status: string;
   completedAt: string | null;
   rule: unknown;
+  reminderPreset: string | null;
   ordem: number;
   subtasks: SubtaskData[];
   category: { id: string; name: string; color: string } | null;

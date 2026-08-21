@@ -28,7 +28,9 @@ export async function GET(req: NextRequest) {
         userId,
         ...(categoria ? { categoryId: categoria } : {}),
         ...(prioridade ? { priority: prioridade } : {}),
-        ...(busca ? { title: { contains: busca, mode: 'insensitive' } } : {}),
+        // SQLite (dev/teste) não suporta `mode: 'insensitive'` — LIKE já é
+        // case-insensitive para ASCII por padrão, então basta o `contains`
+        ...(busca ? { title: { contains: busca } } : {}),
       },
       ...(status === 'pendente' ? { status: 'pendente' } : {}),
       ...(status === 'concluida' ? { status: 'concluida' } : {}),
@@ -71,6 +73,7 @@ export async function GET(req: NextRequest) {
     status: o.status,
     completedAt: o.completedAt?.toISOString() ?? null,
     rule: o.task.rule,
+    reminderPreset: o.task.reminderPreset,
     ordem: o.task.ordem,
     subtasks: o.task.subtasks.map((s) => ({ id: s.id, title: s.title, done: s.done, ordem: s.ordem })),
     category: o.task.category,

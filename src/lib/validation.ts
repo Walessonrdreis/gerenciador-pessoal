@@ -41,6 +41,7 @@ export const taskCreateSchema = z.object({
 
 export const taskUpdateSchema = taskCreateSchema.partial().extend({
   done: z.boolean().optional(),
+  ignored: z.boolean().optional(),
   occurrenceId: z.string().cuid().optional(),
 });
 

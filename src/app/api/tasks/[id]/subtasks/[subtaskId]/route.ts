@@ -17,8 +17,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
   }
-  const { title, done } = parsed.data;
-  if (title === undefined && done === undefined) {
+  const { title, done, ordem } = parsed.data;
+  if (title === undefined && done === undefined && ordem === undefined) {
     return NextResponse.json({ error: 'nenhum campo para atualizar' }, { status: 400 });
   }
 
@@ -27,6 +27,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     data: {
       ...(title !== undefined ? { title } : {}),
       ...(done !== undefined ? { done } : {}),
+      ...(ordem !== undefined ? { ordem } : {}),
     },
   });
   return NextResponse.json(updated);

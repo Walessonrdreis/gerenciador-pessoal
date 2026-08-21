@@ -1,21 +1,26 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { apiGet, apiPost } from '@/lib/api';
+import { apiGet, apiPatch, apiPost } from '@/lib/api';
+import type { TaskRowData } from '@/hooks/useTasks';
 
 interface Category { id: string; name: string; color: string }
 interface Template { id: string; name: string; subtasks: { titulo: string; ordem: number }[] | null; priority: string; categoryId: string | null; reminderPreset: string | null }
-interface SubInput { title: string }
+interface SubInput { title: string; done?: boolean }
 
 export default function TaskForm({
   open,
   onClose,
   onCreated,
+  task,
 }: {
   open: boolean;
   onClose: () => void;
   onCreated: () => void;
+  /** presente = editando essa tarefa; ausente = criando nova */
+  task?: TaskRowData | null;
 }) {
+  const editing = Boolean(task);
   const [cats, setCats] = useState<Category[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [title, setTitle] = useState('');
@@ -32,18 +37,51 @@ export default function TaskForm({
   const [subInput, setSubInput] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [newCatOpen, setNewCatOpen] = useState(false);
+  const [newCatName, setNewCatName] = useState('');
+  const [newCatColor, setNewCatColor] = useState('#7FD88F');
+  const [creatingCat, setCreatingCat] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setError(null);
-    const d = new Date(Date.now() + 60 * 60 * 1000);
-    d.setMinutes(0, 0, 0);
-    setDueAt(d.toISOString().slice(0, 16));
-    setSubs([]);
     setSubInput('');
+    setNewCatOpen(false);
+    setNewCatName('');
     apiGet<Category[]>('/api/categories').then(setCats).catch(() => {});
     apiGet<Template[]>('/api/templates').then(setTemplates).catch(() => {});
-  }, [open]);
+
+    if (task) {
+      setTitle(task.title);
+      setNotes(task.notes ?? '');
+      setPriority(task.priority as 'alta' | 'media' | 'baixa');
+      setCategoryId(task.category?.id ?? '');
+      const due = new Date(task.dueAt);
+      due.setSeconds(0, 0);
+      setDueAt(new Date(due.getTime() - due.getTimezoneOffset() * 60000).toISOString().slice(0, 16));
+      const rule = task.rule as { frequency?: 'daily' | 'weekly' | 'monthly' | 'yearly'; interval?: number; daysOfWeek?: number[]; endDate?: string } | null;
+      setFreq(rule?.frequency ?? '');
+      setInterval_(rule?.interval ?? 1);
+      setDays(rule?.daysOfWeek ?? []);
+      setEndDate(rule?.endDate ? rule.endDate.slice(0, 10) : '');
+      setReminder(task.reminderPreset ?? '30min');
+      setSubs(task.subtasks.map((s) => ({ title: s.title, done: s.done })));
+    } else {
+      setTitle('');
+      setNotes('');
+      setPriority('media');
+      setCategoryId('');
+      const d = new Date(Date.now() + 60 * 60 * 1000);
+      d.setMinutes(0, 0, 0);
+      setDueAt(d.toISOString().slice(0, 16));
+      setFreq('');
+      setInterval_(1);
+      setDays([]);
+      setEndDate('');
+      setReminder('30min');
+      setSubs([]);
+    }
+  }, [open, task]);
 
   if (!open) return null;
 
@@ -53,6 +91,24 @@ export default function TaskForm({
     if (t.categoryId) setCategoryId(t.categoryId);
     if (t.reminderPreset) setReminder(t.reminderPreset);
     setSubs((t.subtasks ?? []).map((s) => ({ title: s.titulo })));
+  };
+
+  const createCategory = async () => {
+    const name = newCatName.trim();
+    if (!name) return;
+    setCreatingCat(true);
+    try {
+      const cat = await apiPost<Category>('/api/categories', { name, color: newCatColor });
+      setCats((prev) => [...prev, cat].sort((a, b) => a.name.localeCompare(b.name)));
+      setCategoryId(cat.id);
+      setNewCatName('');
+      setNewCatOpen(false);
+    } catch (e) {
+      setError('não foi possível criar a categoria (nome já existe?)');
+      console.error(e);
+    } finally {
+      setCreatingCat(false);
+    }
   };
 
   const addSub = () => {
@@ -73,13 +129,18 @@ export default function TaskForm({
         title,
         notes: notes || null,
         priority,
+        // na edição, dueAt reagenda a ocorrência pendente mais próxima (a rota trata isso à parte da Task)
         dueAt: new Date(dueAt).toISOString(),
-        ...(categoryId ? { categoryId } : {}),
-        ...(freq ? { rule: { frequency: freq, interval: interval_, ...(freq === 'weekly' && days.length ? { daysOfWeek: days } : {}), ...(endDate ? { endDate: new Date(endDate).toISOString() } : {}) } } : {}),
-        subtasks: subs.map((s) => ({ title: s.title })),
+        categoryId: categoryId || null,
+        rule: freq ? { frequency: freq, interval: interval_, ...(freq === 'weekly' && days.length ? { daysOfWeek: days } : {}), ...(endDate ? { endDate: new Date(endDate).toISOString() } : {}) } : null,
+        subtasks: subs.map((s) => ({ title: s.title, done: s.done ?? false })),
         reminder: { preset: reminder },
       };
-      await apiPost('/api/tasks', body);
+      if (editing && task) {
+        await apiPatch(`/api/tasks/${task.taskId}`, body);
+      } else {
+        await apiPost('/api/tasks', body);
+      }
       onCreated();
       onClose();
     } catch (e) {
@@ -109,11 +170,11 @@ export default function TaskForm({
         style={{ width: '100%', maxWidth: 640, margin: '0 auto', background: 'var(--bg)', border: '1px solid var(--line)', borderBottom: 'none', padding: '18px 18px 26px', maxHeight: '85dvh', overflowY: 'auto' }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--accent)', fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', marginBottom: 12 }}>
-          <span>&gt; nova tarefa</span>
+          <span>&gt; {editing ? 'editar tarefa' : 'nova tarefa'}</span>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--dim)', cursor: 'pointer', padding: 0, width: 'auto' }}>esc</button>
         </div>
 
-        {templates.length > 0 && field('modelo (opcional)', (
+        {!editing && templates.length > 0 && field('modelo (opcional)', (
           <select
             value=""
             onChange={(e) => {
@@ -143,12 +204,49 @@ export default function TaskForm({
         </div>
 
         {field('categoria', (
-          <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-            <option value="">— nenhuma —</option>
-            {cats.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
+          <>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <select style={{ flex: 1 }} value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
+                <option value="">— nenhuma —</option>
+                {cats.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => setNewCatOpen((v) => !v)}
+                style={{ background: 'transparent', border: '1px solid var(--line)', color: 'var(--accent)', padding: '0 14px', cursor: 'pointer' }}
+              >
+                + nova
+              </button>
+            </div>
+            {newCatOpen && (
+              <div style={{ display: 'flex', gap: 6, marginTop: 6, alignItems: 'center' }}>
+                <input
+                  value={newCatName}
+                  onChange={(e) => setNewCatName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); createCategory(); } }}
+                  placeholder="nome da categoria"
+                  style={{ flex: 1 }}
+                />
+                <input
+                  type="color"
+                  value={newCatColor}
+                  onChange={(e) => setNewCatColor(e.target.value)}
+                  style={{ width: 34, height: 34, padding: 2, background: 'transparent', border: '1px solid var(--line)' }}
+                  aria-label="cor da categoria"
+                />
+                <button
+                  type="button"
+                  onClick={createCategory}
+                  disabled={!newCatName.trim() || creatingCat}
+                  style={{ background: 'var(--accent)', border: 'none', color: 'var(--bg)', padding: '0 14px', height: 34, cursor: 'pointer' }}
+                >
+                  {creatingCat ? '…' : 'criar'}
+                </button>
+              </div>
+            )}
+          </>
         ))}
 
         <div style={{ display: 'flex', gap: 10 }}>
@@ -204,7 +302,7 @@ export default function TaskForm({
           <>
             {subs.map((s, i) => (
               <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4 }}>
-                <span style={{ color: 'var(--accent)' }}>[ ]</span>
+                <span style={{ color: 'var(--accent)' }}>{s.done ? '[x]' : '[ ]'}</span>
                 <span style={{ flex: 1, fontSize: 13 }}>{s.title}</span>
                 <button onClick={() => setSubs((prev) => prev.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: 'var(--dim)', cursor: 'pointer', padding: 0, width: 'auto' }}>
                   x
@@ -225,7 +323,7 @@ export default function TaskForm({
             [cancelar]
           </button>
           <button onClick={submit} disabled={saving || !title.trim()} style={{ flex: 1, background: 'var(--accent)', border: 'none', color: 'var(--bg)', padding: 11, fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', fontWeight: 'bold', cursor: 'pointer' }}>
-            {saving ? 'salvando…' : '[salvar]'}
+            {saving ? 'salvando…' : editing ? '[atualizar]' : '[salvar]'}
           </button>
         </div>
       </div>

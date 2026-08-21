@@ -50,6 +50,18 @@ export default function Hoje() {
     [rows, refresh]
   );
 
+  const onIgnore = useCallback(
+    async (row: TaskRowData) => {
+      try {
+        await apiPatch(`/api/tasks/${row.taskId}`, { ignored: true, occurrenceId: row.id });
+        refresh();
+      } catch (e) {
+        console.error(e);
+      }
+    },
+    [refresh]
+  );
+
   const { overdue, today } = groupToday(rows);
 
   return (
@@ -65,7 +77,7 @@ export default function Hoje() {
         <>
           <div className="sec">&gt; atrasadas ({overdue.length})</div>
           {overdue.map((r) => (
-            <TaskRow key={r.id} row={r} onToggle={onToggle} />
+            <TaskRow key={r.id} row={r} onToggle={onToggle} onIgnore={onIgnore} />
           ))}
         </>
       )}

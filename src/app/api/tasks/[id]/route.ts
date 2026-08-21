@@ -24,7 +24,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
   }
-  const { done, occurrenceId, subtasks, ...fields } = parsed.data;
+  const { done, ignored, occurrenceId, subtasks, ...fields } = parsed.data;
 
   if (subtaskId) {
     const sub = await prisma.subtask.findFirst({ where: { id: subtaskId, taskId: task.id } });
@@ -98,6 +98,17 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     });
   }
 
+  if (ignored === true) {
+    if (!occurrenceId) return NextResponse.json({ error: 'occurrenceId é obrigatório para ignorar' }, { status: 400 });
+    const occurrence = await prisma.taskOccurrence.findFirst({ where: { id: occurrenceId, taskId: task.id } });
+    if (!occurrence) return NextResponse.json({ error: 'ocorrência não encontrada' }, { status: 404 });
+    const updated = await prisma.taskOccurrence.update({
+      where: { id: occurrence.id },
+      data: { status: 'ignorada', completedAt: null },
+    });
+    return NextResponse.json({ occurrence: { id: updated.id, status: updated.status, completedAt: null } });
+  }
+
   if (done === false) {
     if (!occurrenceId) return NextResponse.json({ error: 'occurrenceId é obrigatório' }, { status: 400 });
     const occurrence = await prisma.taskOccurrence.findFirst({ where: { id: occurrenceId, taskId: task.id } });
@@ -111,6 +122,17 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   if (Object.keys(fields).length === 0 && !subtasks) {
     return NextResponse.json({ error: 'nenhum campo para atualizar' }, { status: 400 });
+  }
+
+  // dueAt mora na TaskOccurrence, não na Task — reagenda a ocorrência pendente mais próxima
+  if (fields.dueAt) {
+    const activeOcc = await prisma.taskOccurrence.findFirst({
+      where: { taskId: task.id, status: 'pendente' },
+      orderBy: { dueAt: 'asc' },
+    });
+    if (activeOcc) {
+      await prisma.taskOccurrence.update({ where: { id: activeOcc.id }, data: { dueAt: new Date(fields.dueAt) } });
+    }
   }
 
   if (fields.categoryId) {

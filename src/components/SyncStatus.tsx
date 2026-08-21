@@ -3,10 +3,12 @@
 import { useEffect, useState } from 'react';
 
 export default function SyncStatus() {
-  const [online, setOnline] = useState(navigator.onLine);
+  // `navigator` não existe no SSR — assume online e corrige no client via useEffect.
+  const [online, setOnline] = useState(true);
   const [syncing, setSyncing] = useState(false);
 
   useEffect(() => {
+    setOnline(navigator.onLine);
     const on = () => setOnline(true);
     const off = () => setOnline(false);
     window.addEventListener('online', on);
