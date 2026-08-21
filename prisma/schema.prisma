@@ -7,7 +7,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
 }
 
 model User {
@@ -16,7 +16,7 @@ model User {
   name          String
   email         String    @unique
   emailVerified DateTime? // lido pelo PrismaAdapter (e-mail verificado do provider)
-  avatarUrl     String?
+  image         String? // nome exigido pelo PrismaAdapter do Auth.js
   createdAt     DateTime  @default(now())
 
   tasks      Task[]
