@@ -30,9 +30,11 @@ export default function TaskRow({
 }) {
   const [expanded, setExpanded] = useState(false);
   const [subs, setSubs] = useState<SubtaskData[]>(row.subtasks ?? []);
+  const [confirmingIgnore, setConfirmingIgnore] = useState(false);
   const openEdit = useTaskEditor();
 
   useEffect(() => setSubs(row.subtasks ?? []), [row.subtasks]);
+  useEffect(() => setConfirmingIgnore(false), [row.id]);
 
   const meta = [
     row.dueAt ? new Date(row.dueAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '',
@@ -127,15 +129,34 @@ export default function TaskRow({
         )}
       </div>
       {onIgnore && row.status === 'pendente' && (
-        <button
-          className="expand"
-          onClick={() => onIgnore(row)}
-          style={{ alignSelf: 'flex-start' }}
-          aria-label="ignorar"
-          title="ignorar (some da lista sem concluir)"
-        >
-          ignorar
-        </button>
+        confirmingIgnore ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'flex-end' }}>
+            <span className="meta" style={{ whiteSpace: 'nowrap' }}>ignorar mesmo?</span>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                className="expand"
+                onClick={() => { onIgnore(row); setConfirmingIgnore(false); }}
+                style={{ color: 'var(--alert)' }}
+                autoFocus
+              >
+                sim
+              </button>
+              <button className="expand" onClick={() => setConfirmingIgnore(false)}>
+                não
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            className="expand"
+            onClick={() => setConfirmingIgnore(true)}
+            style={{ alignSelf: 'flex-start' }}
+            aria-label="ignorar"
+            title="ignorar (some da lista sem concluir)"
+          >
+            ignorar
+          </button>
+        )
       )}
     </div>
   );
